@@ -234,6 +234,9 @@ type ImageSpec struct {
 }
 
 // VPCNetworkSpec defines the desired state of the network resources for the cluster for extended VPC Infrastructure support.
+// +kubebuilder:validation:XValidation:rule="!has(self.controlPlaneSubnets) || self.controlPlaneSubnets.all(s, (has(s.id) && s.id != '') || (has(s.zone) && s.zone != ''))",message="zone is required for each control plane subnet if id is not provided"
+// +kubebuilder:validation:XValidation:rule="!has(self.workerSubnets) || self.workerSubnets.all(s, (has(s.id) && s.id != '') || (has(s.zone) && s.zone != ''))",message="zone is required for each worker subnet if id is not provided"
+// +kubebuilder:validation:XValidation:rule="!has(self) || has(self.loadBalancers)",message="loadBalancers is required when network is specified"
 type VPCNetworkSpec struct {
 	// controlPlaneSubnets is a set of Subnet's which define the Control Plane subnets.
 	// +optional

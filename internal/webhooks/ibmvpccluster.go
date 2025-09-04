@@ -77,11 +77,39 @@ func (r *IBMVPCCluster) ValidateDelete(_ context.Context, _ runtime.Object) (adm
 	return nil, nil
 }
 
+// Exported for testing
+func ValidateIBMVPCCluster(vpcCluster *infrav1.IBMVPCCluster) (admission.Warnings, error) {
+	return validateIBMVPCCluster(vpcCluster)
+}
+
 func validateIBMVPCCluster(vpcCluster *infrav1.IBMVPCCluster) (admission.Warnings, error) {
 	var allErrs field.ErrorList
 	if err := validateIBMVPCClusterControlPlane(vpcCluster); err != nil {
 		allErrs = append(allErrs, err)
 	}
+
+	// Validate network spec if present
+	network := vpcCluster.Spec.Network
+	if network != nil {
+		// 1. Ensure at least one load balancer is present
+		if len(network.LoadBalancers) == 0 {
+			allErrs = append(allErrs, field.Required(field.NewPath("spec").Child("network").Child("loadBalancers"), "At least one load balancer must be specified when network is set"))
+		}
+
+		// 2. Validate control plane subnets
+		for i, subnet := range network.ControlPlaneSubnets {
+			if (subnet.ID == nil || *subnet.ID == "") && (subnet.Zone == nil || *subnet.Zone == "") {
+				allErrs = append(allErrs, field.Required(field.NewPath("spec").Child("network").Child("controlPlaneSubnets").Index(i).Child("zone"), "Zone is required for each control plane subnet if ID is not provided"))
+			}
+		}
+		// 3. Validate worker subnets
+		for i, subnet := range network.WorkerSubnets {
+			if (subnet.ID == nil || *subnet.ID == "") && (subnet.Zone == nil || *subnet.Zone == "") {
+				allErrs = append(allErrs, field.Required(field.NewPath("spec").Child("network").Child("workerSubnets").Index(i).Child("zone"), "Zone is required for each worker subnet if ID is not provided"))
+			}
+		}
+	}
+
 	if len(allErrs) == 0 {
 		return nil, nil
 	}
